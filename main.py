@@ -9,12 +9,6 @@ from moviepy.editor import VideoFileClip
 print("repaint")
 # Streamlit rerurns this file everytime a user does an action, so we need to make sure that the model is only loaded once
 
-# if "disable_upload_button" not in st.session_state:
-#     st.session_state.disable_upload_button = True
-
-# if "disable_transcribe_button" not in st.session_state:
-#     st.session_state.disable_transcribe_button = True
-
 
 def toggle_disable(state=None):
     if state is None:
@@ -33,6 +27,10 @@ st.title("Transcriber")
 st.write("Transcribe audio and video files with Whisper")
 # add two columns beneath the container
 col1, col2 = st.columns(2)
+# Add a model selection widget with a default value of "medium" and choices as: tiny, base, small, medium, large
+modelName = col1.selectbox(
+    "Select model", ("tiny", "base", "small", "medium", "large"), index=3
+)
 
 # create a file uploader
 file = col1.empty()
@@ -52,28 +50,12 @@ file = col1.file_uploader(
 )
 
 placeholder_button = col1.empty()
-# transcribe_button = placeholder_button.empty()
-# transcribe_button = placeholder_button.button(
-#     "Transcribe",
-#     key="but-transcribe",
-#     disabled=True,
-# )
-
 
 statusMessageComponent = col1.empty()
 # add a container beneath this file uploader
 fileDownloadContainer = col1.container()
 # add a container for the transcribed text
 resultTextContainer = col2.container()
-
-# if "model_loaded" not in st.session_state:
-#     print("Loading model...")
-#     st.session_state.model_loaded = False
-#     statusMessageComponent.text("Loading language model, this might take a while...")
-#     # edit this such that the user can choose the model
-#     modelInstance = whisper.load_model("medium")
-#     print("Model loaded")
-#     st.session_state.model_loaded = True
 
 
 def check_if_video(filename):
@@ -120,7 +102,7 @@ def process_video(file_str_path):
         statusMessageComponent.text(
             "Loading language model, this might take a while..."
         )
-        modelInstance = whisper.load_model("medium")
+        modelInstance = whisper.load_model(modelName if modelName else "medium")
         statusMessageComponent.text("Transcribing file...")
         result = whisper.transcribe(
             modelInstance,
@@ -182,6 +164,8 @@ if file:
                     mime="text/plain",
                 )
 
-            # show the result
-            col1.text("Transcription result:\n" + result["text"])
-            # resultTextContainer.write(result['text'])
+            # show the result as html such that we can enable scrolling
+            col1.markdown(result["text"])
+            # col1.markdown(
+            # f"<div style='height: 300px; overflow-y: scroll;'>{result['text']}</div>",
+            # )

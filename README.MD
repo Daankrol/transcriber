@@ -8,3 +8,11 @@ Audio is automatically extracted from video files using ffmpeg.
 ```bash
 pip install git+https://github.com/Daankrol/whisper-streamlit.git#egg=whisper
 ```
+
+## Running
+Start the UI with: 
+```python
+python -m streamlit run main.py
+```
+
+NOTE: always use only one tab. If you use more than one, the model will also be loaded more than once. 
