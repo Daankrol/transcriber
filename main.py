@@ -1,9 +1,6 @@
-import gradio as gr
 import streamlit as st
 import whisper
 import os
-import sys
-from io import StringIO
 from moviepy.editor import VideoFileClip
 
 print("repaint")
