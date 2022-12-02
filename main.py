@@ -2,8 +2,9 @@ import streamlit as st
 import whisper
 import os
 from moviepy.editor import VideoFileClip
+import zipfile
 
-print("repaint")
+
 # Streamlit rerurns this file everytime a user does an action, so we need to make sure that the model is only loaded once
 
 
@@ -28,6 +29,9 @@ col1, col2 = st.columns(2)
 modelName = col1.selectbox(
     "Select model", ("tiny", "base", "small", "medium", "large"), index=3
 )
+# create results directory if it does not exist
+if not os.path.exists("results"):
+    os.makedirs("results")
 
 # create a file uploader
 file = col1.empty()
@@ -84,9 +88,10 @@ def extract_audio_from_video(filename):
     # use moviepy to extract the audio from the video
     video = VideoFileClip(filename)
     audio = video.audio
-    audio.write_audiofile("audio.wav")
+    # to results folder
+    audio.write_audiofile("results/audio.wav")
     # return absolute path to the audio file
-    return os.path.abspath("audio.wav")
+    return os.path.abspath("results/audio.wav")
 
 
 def process_video(file_str_path):
@@ -141,28 +146,36 @@ if file:
         print(result)
         if not error_occured:
             # save the file such that the user can download it again
-            with open("result.txt", "w") as f:
-                whisper.utils.write_txt(result["segments"], file=f)
-            with open("result.srt", "w") as f:
+            # use the file name as the name of the file
+
+            srtName = file.name.split(".")[0] + ".srt"
+            srtName = os.path.join("results", srtName)
+            with open(srtName, "w") as f:
                 whisper.utils.write_srt(result["segments"], file=f)
+            txtName = file.name.split(".")[0] + ".txt"
+            txtName = os.path.join("results", txtName)
+            with open(txtName, "w") as f:
+                whisper.utils.write_txt(result["segments"], file=f)
 
-            with open("result.txt", "r") as f:
-                fileDownloadContainer.download_button(
-                    label="Download text",
-                    data=f,
-                    file_name="result.txt",
-                    mime="text/plain",
-                )
-            with open("result.srt", "r") as f:
-                fileDownloadContainer.download_button(
-                    label="Download srt",
-                    data=f,
-                    file_name="result.srt",
-                    mime="text/plain",
-                )
+            # create a zip file
+            zipName = "transcribed_" + file.name.split(".")[0] + ".zip"
+            zipName = os.path.join(zipName)
+            print("zipName", zipName)
 
-            # show the result as html such that we can enable scrolling
-            col1.markdown(result["text"])
-            # col1.markdown(
-            # f"<div style='height: 300px; overflow-y: scroll;'>{result['text']}</div>",
-            # )
+            with zipfile.ZipFile(zipName, "w") as zip:
+                zip.write(srtName)
+                zip.write(txtName)
+
+            with open(zipName, "rb") as f:
+                fdb = fileDownloadContainer.download_button(
+                    "Download transcribed file",
+                    data=f,
+                    file_name=zipName,
+                    mime="application/zip",
+                )
+                # if clicked, remove all files from the results folder
+                if fdb:
+                    for file in os.listdir("results"):
+                        os.remove(os.path.join("results", file))
+                    os.remove(zipName)
+                    print("removed all files from results folder")
