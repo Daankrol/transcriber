@@ -26,35 +26,22 @@ def translate_eng_to_dutch(text, tokenizer, model):
     translated = model.generate(**tokenized_text)
     # decode the text
     translated_text = tokenizer.batch_decode(translated, skip_special_tokens=True)
-    print(translated_text)
     return translated_text[0]
 
-    input_ids = tokenizer.encode(text, return_tensors="pt")
-    outputs = model.generate(input_ids)
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-
 st.set_page_config(layout="wide")
+
+# live text state variable 
+if "live_text" not in st.session_state:
+    st.session_state.live_text = ""
 
 # greet the user with a title
 st.title("Transcriber")
 # subtitle
 st.write("Transcribe audio and video files with Whisper")
-
-# add two columns beneath the container
-col1, col2 = st.columns(2)
-# Add a model selection widget with a default value of "medium" and choices as: tiny, base, small, medium, large
-modelName = col1.selectbox(
-    "Select model", ("tiny", "base", "small", "medium", "large"), index=3
-)
-# create results directory if it does not exist
-if not os.path.exists("results"):
-    os.makedirs("results")
-
-
 # create a file uploader
-file = col1.empty()
-file = col1.file_uploader(
+upc1, upc2 = st.columns(2)
+file = upc1.empty()
+file = upc1.file_uploader(
     "Upload a file",
     type=[
         "mp4",
@@ -68,18 +55,36 @@ file = col1.file_uploader(
         "mp2",
     ],
 )
+modelName = upc2.selectbox(
+    "Select model", ("tiny", "base", "small", "medium", "large"), index=3
+)
 
-placeholder_button = col1.empty()
 
-statusMessageComponent = col1.empty()
-# add a container beneath this file uploader
+placeholder_button = upc2.empty()
+
+statusMessageComponent = st.empty()
+# create results directory if it does not exist
+if not os.path.exists("results"):
+    os.makedirs("results")
+
+col1, col2 = st.columns(2)
 fileDownloadContainer = col1.container()
 # translate button container
-translate_button_container = col1.empty()
-# translate result download button
-translate_result_button = col1.empty()
+
+
+st.markdown("""<hr style="height:2px;border:none;color:#333;background-color:#333;" /> """, unsafe_allow_html=True)
+resultCol1, resultCol2 = st.columns(2)
+# add small header to each column
+resultCol1.subheader("Transcription")
+resultCol2.subheader("Translation")
 # add a container for the transcribed text
-resultTextContainer = col2.container()
+# translate result download button
+translate_button_container = col2.empty()
+resultTextContainer = resultCol1.container()
+print(st.session_state.live_text)
+resultTextContainer.markdown(st.session_state.live_text)
+translateTextContainer = resultCol2.container()
+
 
 
 def check_if_video(filename):
@@ -155,7 +160,6 @@ if file:
         disabled=False,
     )
     statusMessageComponent.text("File uploaded, ready to transcribe!")
-    print("file name:", file.name)
     if transcribe_button:
         transcribe_button = placeholder_button.button("Transcribing...", disabled=True)
         # placeholder_button.button("Transcribing...", disabled=True)
@@ -233,7 +237,7 @@ if "isDoneTranscribing" in st.session_state and st.session_state.isDoneTranscrib
             translation = translate_eng_to_dutch(text, tokenizer, model)
             statusMessageComponent.text("Done translating!")
             # show the translation in markdown so we can auto line break
-            resultTextContainer.markdown(translation)
+            translateTextContainer.markdown(translation)
             # save the translation in results
             translation_name = "translation_" + file.name.split(".")[0] + ".txt"
             with open("results/translation.txt", "w") as f:
