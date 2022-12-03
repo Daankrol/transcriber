@@ -51,8 +51,6 @@ modelName = col1.selectbox(
 if not os.path.exists("results"):
     os.makedirs("results")
 
-if "live_result" not in st.session_state:
-    st.session_state.live_result = ""
 
 # create a file uploader
 file = col1.empty()
