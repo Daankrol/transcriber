@@ -1,9 +1,9 @@
 import streamlit as st
-import whisper
 import os
 from moviepy.editor import VideoFileClip
 import zipfile
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+
+from whisper import *
 
 # Streamlit rerurns this file everytime a user does an action, so we need to make sure that the model is only loaded once
 
@@ -28,16 +28,19 @@ def translate_eng_to_dutch(text, tokenizer, model):
     translated_text = tokenizer.batch_decode(translated, skip_special_tokens=True)
     return translated_text[0]
 
+
 st.set_page_config(layout="wide")
 
-# live text state variable 
+# live text state variable
 if "live_text" not in st.session_state:
     st.session_state.live_text = ""
 
 # greet the user with a title
 st.title("Transcriber")
 # subtitle
-st.write("Transcribe audio and video files with Whisper")
+st.write(
+    "Transcribe and diarize audio and video files using Whisper, Wav2Vec, Nvidia NeMo, Facebook Demucs, Voice Activity Detection and Speaker Diarization"
+)
 # create a file uploader
 upc1, upc2 = st.columns(2)
 file = upc1.empty()
@@ -55,9 +58,6 @@ file = upc1.file_uploader(
         "mp2",
     ],
 )
-modelName = upc2.selectbox(
-    "Select model", ("tiny", "base", "small", "medium", "large"), index=3
-)
 
 
 placeholder_button = upc2.empty()
@@ -72,7 +72,10 @@ fileDownloadContainer = col1.container()
 # translate button container
 
 
-st.markdown("""<hr style="height:2px;border:none;color:#333;background-color:#333;" /> """, unsafe_allow_html=True)
+st.markdown(
+    """<hr style="height:2px;border:none;color:#333;background-color:#333;" /> """,
+    unsafe_allow_html=True,
+)
 resultCol1, resultCol2 = st.columns(2)
 # add small header to each column
 resultCol1.subheader("Transcription")
@@ -84,7 +87,6 @@ resultTextContainer = resultCol1.container()
 print(st.session_state.live_text)
 resultTextContainer.markdown(st.session_state.live_text)
 translateTextContainer = resultCol2.container()
-
 
 
 def check_if_video(filename):
@@ -132,16 +134,7 @@ def process_video(file_str_path):
         statusMessageComponent.text(
             "Loading language model, this might take a while..."
         )
-        modelInstance = whisper.load_model(modelName if modelName else "medium")
-        statusMessageComponent.text("Transcribing file...")
-        result = whisper.transcribe(
-            modelInstance,
-            file_str_path,
-            verbose=True,
-            streamlit_status_component=statusMessageComponent,
-            streamlit_result_component=resultTextContainer,
-            streamlit_state=st.session_state,
-        )
+
     except TypeError as e:
         print(e)
         statusMessageComponent.text("Are you sure that is a correct audio file?")
@@ -183,12 +176,12 @@ if file:
 
             srtName = file.name.split(".")[0] + ".srt"
             srtName = os.path.join("results", srtName)
-            with open(srtName, "w") as f:
-                whisper.utils.write_srt(result["segments"], file=f)
+            # with open(srtName, "w") as f:
+            #     whisper.utils.write_srt(result["segments"], file=f)
             txtName = file.name.split(".")[0] + ".txt"
             txtName = os.path.join("results", txtName)
-            with open(txtName, "w") as f:
-                whisper.utils.write_txt(result["segments"], file=f)
+            # with open(txtName, "w") as f:
+            # whisper.utils.write_txt(result["segments"], file=f)
 
             # create a zip file
             zipName = "transcribed_" + file.name.split(".")[0] + ".zip"
@@ -229,12 +222,13 @@ if "isDoneTranscribing" in st.session_state and st.session_state.isDoneTranscrib
             statusMessageComponent.text("Loading translation model...")
             # load the translation model
             # from eng to dutch
-            tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-nl")
-            model = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-en-nl")
+            # tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-nl")
+            # model = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-en-nl")
 
             # translate the text
             statusMessageComponent.text("Translating...")
-            translation = translate_eng_to_dutch(text, tokenizer, model)
+            # translation = translate_eng_to_dutch(text, tokenizer, model)
+            translation = "hoi"
             statusMessageComponent.text("Done translating!")
             # show the translation in markdown so we can auto line break
             translateTextContainer.markdown(translation)

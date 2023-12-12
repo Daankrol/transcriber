@@ -1,5 +1,2 @@
 streamlit
-git+https://github.com/Daankrol/whisper@main#egg=whisper
 moviepy
-transformers
-sentencepiece
