@@ -3,7 +3,6 @@ import os
 from moviepy.editor import VideoFileClip
 import zipfile
 
-from whisper import *
 
 # Streamlit rerurns this file everytime a user does an action, so we need to make sure that the model is only loaded once
 
