@@ -6,7 +6,11 @@ Audio is automatically extracted from video files using ffmpeg.
 
 ## Install
 ```bash
-pip install git+https://github.com/Daankrol/whisper-streamlit.git#egg=whisper
+conda create -n transcriberr python=3.10
+pip install -r requirements.txt
+brew install ffmpeg
+
+#pip install git+https://github.com/Daankrol/whisper-streamlit.git#egg=whisper
 ```
 
 ## Running

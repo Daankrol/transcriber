@@ -1,3 +1,6 @@
 [submodule "whisper-daan"]
 	path = whisper-diarization
 	url = https://github.com/Daankrol/whisper-diarization.git
+[submodule "whisper"]
+	path = whisper
+	url = https://github.com/Daankrol/whisper-diarization.git
