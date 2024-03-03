@@ -3,12 +3,11 @@ import os
 
 import zipfile
 from types import SimpleNamespace
-import torch
+import time
 from utils import check_if_video, extract_audio_from_video
-from convert_output import TxtFormatter, SrtFormatter, convert
+from convert_output import convert
 
 from transformers import pipeline
-import torch
 
 import sentry_sdk
 
@@ -28,23 +27,17 @@ if not os.path.exists("results"):
     os.makedirs("results")
 
 
-def translate_eng_to_dutch(text, tokenizer, model):
-    # tokenize the text
-    tokenized_text = tokenizer(text, return_tensors="pt")
-    # translate the text
-    translated = model.generate(**tokenized_text)
-    # decode the text
-    translated_text = tokenizer.batch_decode(translated, skip_special_tokens=True)
-    return translated_text[0]
+def translate_eng_to_dutch(text):
+    # check if translation pipeline is in st state if not create it
+    if "translate_pipe" not in st.session_state:
+        st.session_state.translate_pipe = pipeline(
+            "translation", model="Helsinki-NLP/opus-mt-en-nl"
+        )
+    translation = st.session_state.translate_pipe(text)
+    return translation[0]["translation_text"]
 
 
-pipe = None
 st.set_page_config(layout="wide")
-
-# live text state variable
-if "live_text" not in st.session_state:
-    st.session_state.live_text = ""
-
 st.title("Transcriber")
 st.write(
     "Transcribe and diarize audio and video files using Whisper  \n  \n\
@@ -54,6 +47,12 @@ Whisper-Tiny is the smallest and fastest model, use only for debugging  \n  \n\
 If you have out-of-memory issues, try reducing the batch size."
 )
 
+# Initialize button states
+if "transcribe_button_enabled" not in st.session_state:
+    st.session_state.transcribe_button_enabled = False
+
+if "translate_button_enabled" not in st.session_state:
+    st.session_state.translate_button_enabled = False
 
 ## show parameter selections but now in two columsn:
 col1, col2 = st.columns(2)
@@ -78,9 +77,9 @@ parameters = SimpleNamespace(
         ],
         index=0,
     ),
-    translate_to_dutch=col2.checkbox(
-        'Translate to Dutch (only possible if using "transcribe")', value=False
-    ),
+    # translate_to_dutch=col2.checkbox(
+    #     'Translate to Dutch (only possible if using "transcribe")', value=False
+    # ),
 )
 
 # divider:
@@ -106,16 +105,15 @@ file = st.file_uploader(
         "mp2",
     ],
 )
-transcribe_button_placeholder = st.empty()
+transcribe_button_placeholder, translate_button_container = st.columns(2)
 
-transcribe_button = transcribe_button_placeholder.button(
-    "Transcribe",
-    disabled=True,
-    key="transcribe_button_disabled",
-)
+
 statusMessageComponent = st.empty()
 col1, col2 = st.columns(2)
 fileDownloadContainer = col1.container()
+
+translate_button_container = col2.container()
+translateTextContainer = st.container()
 
 
 def process_video(file_str_path):
@@ -128,7 +126,7 @@ def process_video(file_str_path):
         print("going to transcribe file", file_str_path)
         parameters.audio = file_str_path
         with st.spinner("Transcribing..."):
-            result = pipe(
+            result = st.session_state.pipe(
                 parameters.audio,
                 chunk_length_s=30,
                 batch_size=parameters.batch_size,
@@ -152,32 +150,33 @@ def process_video(file_str_path):
 
 if file:
     # place the spinner in the placeholder:
-    if pipe is None:
+    if "pipe" not in st.session_state:
         with st.spinner("Loading model, this could take a while..."):
-            pipe = pipeline(
+            st.session_state.pipe = pipeline(
                 "automatic-speech-recognition",
                 model=parameters.model_name,
                 device=parameters.device,
                 batch_size=parameters.batch_size,
                 torch_dtype=parameters.torch_dtype,
             )
-    statusMessageComponent.text("Ready to transcribe!")
-    # enable the transcribe button using the key and not using the funciton:
-    transcribe_button = transcribe_button_placeholder.button(
-        "Transcribe",
-        disabled=False,
-        key="transcribe_button_enabled",
-    )
 
-    if transcribe_button:
+    statusMessageComponent.text("Ready to transcribe!")
+    # enable the transcribe button
+    st.session_state.transcribe_button_enabled = True
+
+    if transcribe_button_placeholder.button(
+        "Transcribe",
+        disabled=not st.session_state.transcribe_button_enabled,
+        key="transcribe_button_disabled",
+    ):
         with open(file.name, "wb") as f:
             f.write(file.getbuffer())
         # get the absolute path to the file
         file_str_path = os.path.abspath(file.name)
-        # process the file
-        print("going to process file:", file_str_path)
+
+        now = time.time()
         result, error_occured = process_video(file_str_path)
-        print(result)
+        duration = time.time() - now
         # save result in state variable
         st.session_state.result = result
         st.session_state.error_occured = error_occured
@@ -185,6 +184,7 @@ if file:
 
         # show result in status message
         statusMessageComponent.text(result["text"])
+        statusMessageComponent.text(f"Transcription took {duration:.2f} seconds")
 
         if not error_occured:
             # file is saved as results/output.srt, lets change the name to the original file name
@@ -196,6 +196,9 @@ if file:
 
             # # create a zip file
             zipName = "results/" + file.name.split(".")[0] + ".zip"
+
+            st.session_state.file_names = [srtName, txtName, zipName]
+
             with zipfile.ZipFile(zipName, "w") as zip:
                 zip.write(srtName)
                 zip.write(txtName)
@@ -207,53 +210,57 @@ if file:
                     file_name=zipName,
                     mime="application/zip",
                 )
-                if fdb:
-                    for file in os.listdir("results"):
-                        os.remove(os.path.join("results", file))
-                    os.remove(zipName)
-                    print("removed all files from results folder")
 
 # if the user has transcribed a file, show a button for starting a translation
 # check if key present
-# if "isDoneTranscribing" in st.session_state and st.session_state.isDoneTranscribing:
-#     if not st.session_state.error_occured:
-#         translate_button = translate_button_container.button(
-#             "Translate to Dutch",
-#         )
-#         if translate_button:
-#             result = st.session_state.result
-#             text = result["text"]
+if "isDoneTranscribing" in st.session_state and st.session_state.isDoneTranscribing:
+    if not st.session_state.error_occured:
+        st.session_state.translate_button_enabled = True
 
-#             # show message
-#             statusMessageComponent.text("Loading translation model...")
-#             # load the translation model
-#             # tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-nl")
-#             # model = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-en-nl")
+        if translate_button_container.button(
+            "Translate to Dutch",
+            disabled=not st.session_state.translate_button_enabled,
+            key="translate_button_disabled",
+        ):
+            result = st.session_state.result
+            text = result["text"]
 
-#             # translate the text
-#             statusMessageComponent.text("Translating...")
-#             # translation = translate_eng_to_dutch(text, tokenizer, model)
-#             translation = "hoi"
-#             statusMessageComponent.text("Done translating!")
-#             # show the translation in markdown so we can auto line break
-#             translateTextContainer.markdown(translation)
-#             # save the translation in results
-#             translation_name = "translation_" + file.name.split(".")[0] + ".txt"
-#             with open("results/translation.txt", "w") as f:
-#                 f.write(translation)
-#             # download button for the translation
-#             with open("translation.txt", "w") as f:
-#                 f.write(translation)
-#             with open("translation.txt", "rb") as f:
-#                 fdb = fileDownloadContainer.download_button(
-#                     "Download translation",
-#                     data=f,
-#                     file_name=translation_name,
-#                     mime="text/plain",
-#                 )
-#                 # if clicked, remove all files from the results folder
-#                 if fdb:
-#                     for file in os.listdir("results"):
-#                         os.remove(os.path.join("results", file))
-#                     os.remove("translation.txt")
-#                     print("removed all files from results folder")
+            # show message
+            statusMessageComponent.text("Loading translation model...")
+
+            # translate the text
+            statusMessageComponent.text("Translating...")
+            start = time.time()
+            translation = translate_eng_to_dutch(text)
+            translation_duration = time.time() - start
+            statusMessageComponent.text(
+                f"Done translating, took {str(translation_duration)} seconds."
+            )
+            # show the translation in markdown so we can auto line break
+            translateTextContainer.markdown(translation)
+            translation_name = "results/" + file.name.split(".")[0] + "_translation.txt"
+            # save the translation in results and save it as translation.txt
+            with open(translation_name, "w") as f:
+                f.write(translation)
+
+            [srtName, txtName, zipName] = st.session_state.file_names
+            zipName = "results/" + file.name.split(".")[0] + "_translation.zip"
+            with zipfile.ZipFile(zipName, "w") as zip:
+                zip.write(srtName)
+                zip.write(txtName)
+                zip.write(translation_name)
+
+            # download button for the translation
+            with open(translation_name, "rb") as f:
+                fdb = fileDownloadContainer.download_button(
+                    "Download translation",
+                    data=f,
+                    file_name=zipName,
+                    mime="application/zip",
+                )
+                # if clicked, remove all files from the results folder
+                if fdb:
+                    for file in os.listdir("results"):
+                        os.remove(os.path.join("results", file))
+                    os.remove("translation.txt")
+                    print("removed all files from results folder")

@@ -2,3 +2,5 @@ streamlit
 moviepy
 torch
 transformers
+sentencepiece
+sentry-sdk
