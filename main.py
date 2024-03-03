@@ -10,6 +10,20 @@ from convert_output import TxtFormatter, SrtFormatter, convert
 from transformers import pipeline
 import torch
 
+import sentry_sdk
+
+sentry_sdk.init(
+    dsn="https://47fe40328a7d72860ac879ce9a7cc372@o4506060209192960.ingest.sentry.io/4506847038013440",
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for performance monitoring.
+    traces_sample_rate=1.0,
+    # Set profiles_sample_rate to 1.0 to profile 100%
+    # of sampled transactions.
+    # We recommend adjusting this value in production.
+    profiles_sample_rate=1.0,
+)
+
+
 if not os.path.exists("results"):
     os.makedirs("results")
 
@@ -128,6 +142,7 @@ def process_video(file_str_path):
         statusMessageComponent.text("Are you sure that is a correct audio file?")
         return {"text": "Something went wrong", "segments": []}, True
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         print(e)
         statusMessageComponent.text("Something went wrong: \n" + str(e))
         return {"text": "Something went wrong", "segments": []}, True
