@@ -65,7 +65,7 @@ parameters = SimpleNamespace(
         index=0,
     ),
     translate_to_dutch=col2.checkbox(
-        'Translate to Dutch (only possible if using \transcribe")', value=False
+        'Translate to Dutch (only possible if using "transcribe")', value=False
     ),
 )
 
